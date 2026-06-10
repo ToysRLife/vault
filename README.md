@@ -1,8 +1,12 @@
 # Vault — Personal Wealth OS
 
-A static, browser-only personal finance + retirement planning dashboard. Runs from `file://` in any modern browser. All data lives in your browser's localStorage; CSV import/export keeps your master files on disk.
+> A static, browser-only personal finance + retirement planning dashboard. No server. No account. No cloud. No telemetry. Open `index.html` and go.
 
-No server. No account. No cloud. No telemetry. Open `index.html` and go.
+**🌐 Live demo:** [toysrlife.github.io/vault](https://toysrlife.github.io/vault/) · **📂 Repo:** [github.com/ToysRLife/vault](https://github.com/ToysRLife/vault)
+
+---
+
+All data lives in your browser's localStorage; CSV import/export keeps your master files on disk. The seed data shipped here is **sample/example** — replace with your own via the UI or by editing CSVs.
 
 ## Highlights
 
@@ -23,12 +27,22 @@ No server. No account. No cloud. No telemetry. Open `index.html` and go.
 
 ## Quick Start
 
+### Option A — Just try the live demo
+Open **https://toysrlife.github.io/vault/** — no install, no signup. Seed data loads instantly. Click around. All edits stay in *your* browser only.
+
+### Option B — Run it locally
 1. Clone or download this repo
 2. Open `index.html` in any modern browser (Chrome, Edge, Firefox, Safari)
 3. Seed data auto-loads on first visit
 4. Click **Settings → Load Seed Data** anytime to reset to defaults
 5. Use **Settings → Export All CSVs** to back up your data to disk
 6. Use **Import All CSVs** to restore from disk
+
+### Option C — Self-host as your own private dashboard
+1. Fork this repo
+2. Enable GitHub Pages (Settings → Pages → Source: `Deploy from a branch` → `main` / root)
+3. Your private copy is now live at `https://<your-username>.github.io/vault/`
+4. Use Import/Export CSVs to roundtrip your real data without committing it
 
 ## Project Layout
 
@@ -108,10 +122,28 @@ Transactions are extracted, auto-categorized via merchant rules, and shown for r
 - [pdf.js](https://mozilla.github.io/pdf.js/) for credit card PDF extraction
 - All via CDN — no `npm install` needed
 
+## Roadmap ideas (open to PRs)
+
+- Goal-allocation linking — which investment bucket funds which goal
+- Tax efficiency dashboard — 80C, 80D, 80CCD(1B) utilization tracker
+- XIRR per asset class (vs current value)
+- Spend anomaly detection (statistical outliers vs trailing 12-month avg)
+- Insurance adequacy check (term + health coverage scoring)
+- Asset rebalancing recommender ("you're 65% RE — sell ₹X to hit 50% target")
+- Loan prepayment what-if calculator
+- Multi-currency support
+- Family/shared mode (multiple users on one dashboard)
+
+## Privacy & Security
+
+- All data in your browser's localStorage. Nothing leaves your machine.
+- The only network calls are to public CDNs for Chart.js, PapaParse, and pdf.js. To go fully offline, download those files into a local `lib/` folder and update the `<script>` src paths in `index.html`.
+- This repo contains **only sample data**. Your real numbers stay in your browser.
+
 ## License
 
 MIT — do whatever you want with it.
 
 ## Status
 
-Experimental / personal-use. Built with [Claude Code](https://claude.com/claude-code) as a long-form coding exercise.
+Experimental / personal-use. Built with [Claude Code](https://claude.com/claude-code) as a long-form coding exercise. PRs welcome but not actively maintained.
