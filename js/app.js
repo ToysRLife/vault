@@ -84,10 +84,8 @@ const MERCHANT_RULES = [
   { match: /DCC FEE|FOREX|IGST-CI/i, cat: "Travel", sub: "Forex Fee" },
   { match: /BOOKMYSHOW|PVR|INOX|NETFLIX|HOTSTAR|PRIME VIDEO|SPOTIFY|YOUTUBE/i, cat: "Entertainment", sub: "Media" },
   { match: /GAME THEORY/i, cat: "Entertainment", sub: "Gaming Cafe" },
-  { match: /SGMPL WHISPERING PETA/i, cat: "Investment", sub: "Home" },
   { match: /POLICYBAZAAR/i, cat: "Insurance", sub: "General", note: "Large amounts may be ULIP - confirm" },
   { match: /ICICI ?LOMBARD|HDFC ERGO|BAJAJ ALLIANZ|TATA AIG|RELIANCE GENERAL/i, cat: "Insurance", sub: "General" },
-  { match: /PRADHAN MANTRI BHARTI/i, cat: "Medical", sub: "PM Scheme" },
   { match: /GANESH MEDICAL|APOLLO PHARMACY|MEDPLUS|1MG|NETMEDS/i, cat: "Medical", sub: "Pharmacy" },
   { match: /REWARD 360 GLOBAL SERV/i, cat: "Uncategorized", sub: "Reward 360 - verify" },
   { match: /ZUDIO|MYNTRA|AJIO|FLIPKART|AMAZON|MAX|RELIANCE TREND/i, cat: "Shopping", sub: "Apparel" },
@@ -245,57 +243,9 @@ function loadAll() {
     Object.keys(appData).forEach(k => {
       if (parsed[k] !== undefined) appData[k] = parsed[k];
     });
-
-    // Version check: NON-DESTRUCTIVE. We never overwrite a section that has user data.
-    // We only:
-    //  (a) populate any section that is missing or empty
-    //  (b) MERGE new taxonomy entries (additive only — never delete or overwrite)
-    const storedVer = parseInt(localStorage.getItem(VERSION_KEY) || "0");
-    let resync = 0;
-    if (storedVer < SEED_VERSION && window.EMBEDDED_SEED) {
-      Object.keys(appData).forEach(k => {
-        if (Array.isArray(appData[k]) && appData[k].length === 0 && window.EMBEDDED_SEED[k]) {
-          try {
-            const rows = parseCSV(window.EMBEDDED_SEED[k]);
-            coerceNumeric(k, rows);
-            appData[k] = rows;
-            resync++;
-          } catch (e) { console.warn("Seed populate " + k + " failed:", e.message); }
-        }
-      });
-      // Merge new taxonomy entries (addToTaxonomy is idempotent: skips duplicates)
-      if (window.EMBEDDED_SEED.taxonomy && Array.isArray(appData.taxonomy)) {
-        try {
-          const seedTax = parseCSV(window.EMBEDDED_SEED.taxonomy);
-          let added = 0;
-          seedTax.forEach(s => { if (addToTaxonomy(s.type, s.name, s.parent || "")) added++; });
-          if (added > 0) resync++;
-        } catch (e) {}
-      }
-      localStorage.setItem(VERSION_KEY, String(SEED_VERSION));
-      saveAll();
-      if (resync > 0) {
-        setTimeout(() => toast("Schema updated to v" + SEED_VERSION + ". Your edits are preserved."), 300);
-      }
-    } else {
-      // Backfill any missing keys (e.g., new schema added)
-      let backfilled = 0;
-      Object.keys(appData).forEach(k => {
-        if ((parsed[k] === undefined || (Array.isArray(appData[k]) && appData[k].length === 0))
-            && window.EMBEDDED_SEED && window.EMBEDDED_SEED[k]) {
-          try {
-            const rows = parseCSV(window.EMBEDDED_SEED[k]);
-            coerceNumeric(k, rows);
-            appData[k] = rows;
-            backfilled++;
-          } catch (e) { console.warn("Backfill " + k + " failed:", e.message); }
-        }
-      });
-      if (backfilled > 0) {
-        saveAll();
-        setTimeout(() => toast("Loaded " + backfilled + " new data section(s) from seed"), 200);
-      }
-    }
+    // No auto seed-loading. We only mark the version (so we don't re-check).
+    // To load sample data, user clicks Settings → Load Seed Data explicitly.
+    localStorage.setItem(VERSION_KEY, String(SEED_VERSION));
     return true;
   } catch (e) {
     console.error("Load failed:", e);
@@ -665,7 +615,16 @@ function plannedMonthly() {
 }
 
 /* -------------------- Dashboard -------------------- */
+function isAppDataEmpty() {
+  const arrays = ["investments", "loans", "real_estate", "transactions", "planned_budget", "projection_segments", "goals"];
+  return arrays.every(k => !appData[k] || appData[k].length === 0);
+}
+
 function renderDashboard() {
+  // Show welcome card if nothing has been added yet (fresh visitor)
+  const welcome = $("#welcome-card");
+  if (welcome) welcome.style.display = isAppDataEmpty() ? "block" : "none";
+
   // ---- Compute investor metrics from Future tab segments ----
   const segments = appData.projection_segments || [];
   const investmentSegs = segments.filter(s => s.type === "investment");
@@ -2099,9 +2058,10 @@ function applyMilestones(balances, segIdx, year, assumptions, flags) {
   }
 }
 
-// Ensure Pension Annuity segment exists for existing users (idempotent)
+// Ensure Pension Annuity segment exists for users who already have other segments (idempotent).
+// Skips entirely if the user has no segments at all (fresh visitor — we don't auto-create).
 function ensurePensionAnnuitySegment() {
-  if (!appData.projection_segments) appData.projection_segments = [];
+  if (!appData.projection_segments || appData.projection_segments.length === 0) return;
   const hasPension = appData.projection_segments.some(s => /pension|annuity/i.test(s.name || ""));
   if (!hasPension) {
     appData.projection_segments.push({
@@ -2811,7 +2771,7 @@ function extractSBITransactions(text) {
     });
   }
 
-  const HEADER_NOISE = /TRANSACTIONS FOR|chetan chauhan|GSTIN|Statement Period|Outstanding|Important|Date Amount|CASHBACK|CKYC|For Statement|HSN Code|Authorized Signatory|to\b/i;
+  const HEADER_NOISE = /TRANSACTIONS FOR|GSTIN|Statement Period|Outstanding|Important|Date Amount|CASHBACK|CKYC|For Statement|HSN Code|Authorized Signatory|Name\s+[A-Z]{3,}|to\b/i;
 
   // 2) For each date anchor, find amount+D/C in the segment up to next anchor
   for (let i = 0; i < dateMatches.length; i++) {
@@ -2858,7 +2818,7 @@ function extractAxisTransactions(text) {
     const amt = Number(amountStr.replace(/,/g, ""));
     if (!merchant || merchant.length < 3) continue;
     // Skip noise/headers
-    if (/Total Payment|Minimum Payment|Statement Period|Previous Balance|Account Summary|Cashback|Card No|Page \d|TRANSACTIONS FOR|Name CHETAN/i.test(merchant)) continue;
+    if (/Total Payment|Minimum Payment|Statement Period|Previous Balance|Account Summary|Cashback|Card No|Page \d|TRANSACTIONS FOR|Name\s+[A-Z]{3,}/i.test(merchant)) continue;
     // Split merchant + category — category is often last word(s) all-caps with dashes
     let merchantClean = merchant.trim();
     const catMatch = merchantClean.match(/\s+([A-Z][A-Z &/-]{4,})$/);
@@ -3037,6 +2997,19 @@ function wireUI() {
   // Legacy alias if present anywhere:
   wireSafe("#btn-export-all-2", () => Object.keys(CSV_SCHEMAS).forEach(name => exportTable(name)));
   wireSafe("#btn-load-seed", loadSeed);
+  // Welcome-card actions
+  wireSafe("#btn-welcome-seed", () => { loadSeed(); });
+  wireSafe("#btn-welcome-import", () => {
+    // Jump to Settings tab → bulk import
+    const settingsBtn = document.querySelector('.nav-item[data-tab="settings"]');
+    if (settingsBtn) settingsBtn.click();
+    setTimeout(() => $("#bulk-import")?.click(), 200);
+  });
+  wireSafe("#btn-welcome-manual", () => {
+    // Jump to Expenses tab so user can start adding transactions
+    const expBtn = document.querySelector('.nav-item[data-tab="expenses"]');
+    if (expBtn) expBtn.click();
+  });
   wireSafe("#btn-clear-data", () => {
     if (!confirm("Clear all stored data? This cannot be undone.")) return;
     localStorage.removeItem(STORAGE_KEY);
@@ -3201,11 +3174,7 @@ function init() {
   initDrawer();
   wireUI();
   updateTopbarTitle("dashboard");
-  const had = loadAll();
-  if (!had) {
-    loadSeed().then(() => { renderAll(); }).catch(() => { renderAll(); });
-  } else {
-    renderAll();
-  }
+  loadAll();      // populates appData from localStorage if present, otherwise leaves it empty
+  renderAll();    // empty state shows a welcome card with explicit opt-in to load sample data
 }
 document.addEventListener("DOMContentLoaded", init);

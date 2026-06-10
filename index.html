@@ -78,6 +78,20 @@
         </div>
       </div>
 
+      <!-- Welcome card (shown only when data is empty) -->
+      <div class="welcome-card card" id="welcome-card" style="display:none">
+        <div class="welcome-icon">👋</div>
+        <h2>Welcome to Vault</h2>
+        <p class="welcome-lead">Your personal wealth &amp; retirement planning dashboard. All data stays in <b>your browser</b> only — nothing is uploaded or shared.</p>
+        <p class="muted small">Get started by:</p>
+        <div class="welcome-actions">
+          <button class="btn primary" id="btn-welcome-seed">Load Sample Data</button>
+          <button class="btn ghost" id="btn-welcome-import">Import Your CSVs</button>
+          <button class="btn ghost" id="btn-welcome-manual">Add Manually</button>
+        </div>
+        <p class="muted small" style="margin-top:14px">Tip: Sample data lets you explore the features. You can clear it any time from Settings.</p>
+      </div>
+
       <!-- Hero metrics (4 in a row) -->
       <div class="hero-kpi-grid">
         <div class="hero-card primary">

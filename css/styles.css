@@ -853,6 +853,43 @@ input:focus, select:focus, textarea:focus {
 }
 .toggle-label { font-weight: 500; }
 
+/* ---------- Welcome card (shown when localStorage is empty) ---------- */
+.welcome-card {
+  padding: 40px 32px;
+  text-align: center;
+  margin-bottom: 18px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(500px 320px at 50% 0%, rgba(139, 92, 246, 0.10), transparent 65%),
+    var(--bg-card);
+}
+.welcome-icon {
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 14px;
+}
+.welcome-card h2 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px 0;
+}
+.welcome-lead {
+  font-size: 15px;
+  color: var(--text-2);
+  max-width: 580px;
+  margin: 0 auto 18px;
+  line-height: 1.55;
+}
+.welcome-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 8px;
+}
+
 /* ---------- Path to FI panel ---------- */
 .fi-panel {
   margin-bottom: 18px;

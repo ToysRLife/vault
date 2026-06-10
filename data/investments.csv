@@ -1,25 +1,11 @@
 id,entity,term,category,expiry,invested_lakh,current_value_lakh,realized_profit_lakh,owner,client_id,policy_number,due_date,notes
-1,Business Investment,Mid Term,Business,2025,1.65,0,2,,,,,
-2,Mutual Fund - Equity (annual),Mid Term,Equity,2025,3,0,3.5,,,,,
-3,Brokerage Account,Short Term,Equity,2021,6,0,5.5,,,,,
-4,PPF,Long Term,FD,2035,3.7,5.7,0,,,,2035,
-5,Locker / Savings,Short Term,FD,2021,0.1,0.1,0,,,,,
-6,SSY,Long Term,FD,2040,0,2.5,,,,,,
-7,Life Insurance - Endowment,Long Term,FD,2030,0.24,0.24,,,,,,
-8,Recurring Deposit (annual),Long Term,FD,2030,1.5,1.5,0,,,,,
-9,Gold Chain,Long Term,Gold,,0.71,2.1,0,,,,,12 grams
-10,Gold Bracelet,Long Term,Gold,,0.6,2.1,0,,,,,12 grams
-11,Gold Chain 2,Long Term,Gold,,0.98,0.98,,,,,,12 grams
-12,Gold Coin,Long Term,Gold,,0.6,1.75,0,,,,,10 grams
-13,Gold Bangle,Long Term,Gold,,1.1,4.38,0,,,,,25 grams
-14,Gold Kalyan Chain,Long Term,Gold,,0.17,0.53,0,,,,,3 grams
-15,Gold Kalyan Item,Long Term,Gold,,0.37,1.4,0,,,,,8 grams
-16,SGB 2020-21 Series II,Long Term,Gold,2028,0.9,3.5,0,,,,,20 grams
-17,SGB 2020-21 Series IV,Long Term,Gold,2028,0.96,3.5,0,,,,,20 grams
-18,SGB 2020-21 Series V,Long Term,Gold,2028,2.11,7,0,,,,,40 grams
-19,SGB 2021 May,Long Term,Gold,2029,0.95,3.5,0,,,,,20 grams
-20,SGB 2021-22 Series VI,Long Term,Gold,2029,0.94,3.5,0,,,,,20 grams
-21,Gold Ring,Long Term,Gold,,0.88,1.23,,,,,,7 grams
-22,SGB 2020-21 Series IX,Long Term,Gold,2029,0.49,1.75,0,,,,,10 grams
-23,Provident Fund (EPF),Retirement,Retirement,2046,12.32,12.32,0,,,,,Provident Fund
-24,ULIP - Equity,Mid Term,Equity,2029,0.2,0.2,0,,,,,Max Life
+1,Equity Mutual Fund,Long Term,Equity,2030,5,7,0,,,,,Sample
+2,Direct Stocks,Long Term,Equity,,3,5,0,,,,,Sample
+3,PPF,Long Term,FD,2035,3,5,0,,,,2035,Sample
+4,SSY,Long Term,FD,2040,2,3,0,,,,2040,Sample
+5,Fixed Deposit,Mid Term,FD,2028,2,2.2,0,,,,2028,Sample
+6,Gold Jewellery,Long Term,Gold,,2,4,0,,,,,Sample
+7,Sovereign Gold Bond,Long Term,Gold,2028,1,2,0,,,,,Sample
+8,Provident Fund,Retirement,Retirement,2046,10,10,0,,,,,Sample
+9,NPS,Retirement,Retirement,2049,2,2.5,0,,,,,Sample
+10,ULIP,Mid Term,Equity,2029,1,1.2,0,,,,,Sample
