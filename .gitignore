@@ -1,0 +1,15 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Personal exports — never commit
+*.user.csv
+data/*.user.csv
+exports/
+
+# Local logs / temp
+*.log
+.tmp/

@@ -1,0 +1,6 @@
+id,name,target_year,target_amount,current_allocation,monthly_contribution,expected_return_pct,priority,linked_segment,notes
+1,Retirement Corpus,2046,65000000,5000000,150000,8,high,Retirement (PF + NPS),25x annual expense at retirement
+2,Daughter's Higher Education,2040,10000000,250000,15000,7.6,high,FD / Fixed Income,SSY maturity + dedicated SIP
+3,Home Upgrade / Repair,2032,5000000,0,20000,9,medium,Equity,Property repair / 2nd property downpayment
+4,Foreign Travel Fund,2030,2000000,0,12000,8,low,Equity,Annual international trips
+5,Daughter's Wedding,2050,5000000,0,8000,8,medium,Gold,Long-horizon gold + equity blend

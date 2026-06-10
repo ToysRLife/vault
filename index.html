@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vault — Personal Wealth OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body data-theme="dark">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark"></div>
+      <div>
+        <div class="brand-name">Vault</div>
+        <div class="brand-tag">Wealth OS</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-tab="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></a>
+      <a class="nav-item" data-tab="investments"><span class="nav-icon">◈</span><span>Investments</span></a>
+      <a class="nav-item" data-tab="loans"><span class="nav-icon">⊟</span><span>Loans</span></a>
+      <a class="nav-item" data-tab="real-estate"><span class="nav-icon">▣</span><span>Real Estate</span></a>
+      <div class="nav-divider"></div>
+      <a class="nav-item" data-tab="expenses"><span class="nav-icon">≡</span><span>Expenses</span></a>
+      <a class="nav-item" data-tab="planned"><span class="nav-icon">◇</span><span>Plan vs Actual</span></a>
+      <a class="nav-item" data-tab="statements"><span class="nav-icon">↑</span><span>Statements</span></a>
+      <div class="nav-divider"></div>
+      <a class="nav-item" data-tab="goals"><span class="nav-icon">◎</span><span>Goals</span></a>
+      <a class="nav-item" data-tab="projections"><span class="nav-icon">∿</span><span>Future</span></a>
+      <a class="nav-item" data-tab="settings"><span class="nav-icon">⚙</span><span>Settings</span></a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+        <span class="theme-icon-dark">◐</span>
+        <span class="theme-icon-light">◑</span>
+      </button>
+      <div class="storage-pill" id="storage-info-pill"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="app-main">
+    <!-- Mobile-only top bar (hidden on desktop) -->
+    <div class="mobile-topbar">
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="brand-mark"></div>
+      <div class="mobile-brand-text">
+        <div class="brand-name">Vault</div>
+        <div class="brand-tag">Wealth OS</div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle-mobile" title="Toggle theme">
+        <span class="theme-icon-dark">◐</span>
+        <span class="theme-icon-light">◑</span>
+      </button>
+    </div>
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+    <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="dashboard" class="view active">
+      <div class="page-header">
+        <div>
+          <h1>Wealth Snapshot</h1>
+          <p class="page-sub">Live view · <span id="dash-as-of">—</span></p>
+        </div>
+      </div>
+
+      <!-- Hero metrics (4 in a row) -->
+      <div class="hero-kpi-grid">
+        <div class="hero-card primary">
+          <div class="hero-card-label">Net Worth</div>
+          <div class="hero-card-value" id="kpi-networth">—</div>
+          <div class="hero-card-meta" id="kpi-networth-meta">Assets − Liabilities</div>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-label">Liquid Net Worth</div>
+          <div class="hero-card-value" id="kpi-liquid-nw">—</div>
+          <div class="hero-card-meta">Excl. Real Estate &amp; Retirement</div>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-label">Debt-to-Asset Ratio</div>
+          <div class="hero-card-value" id="kpi-debt-ratio">—</div>
+          <div class="hero-card-meta" id="kpi-debt-ratio-meta">Total debt vs assets</div>
+        </div>
+        <div class="hero-card">
+          <div class="hero-card-label">Months of Runway</div>
+          <div class="hero-card-value" id="kpi-runway">—</div>
+          <div class="hero-card-meta">If income stopped today</div>
+        </div>
+      </div>
+
+      <!-- Path to Financial Independence -->
+      <section class="fi-panel card">
+        <div class="fi-panel-head">
+          <div>
+            <h3>Path to Financial Independence</h3>
+            <span class="fi-panel-sub">Corpus to retire = 25× annual expense (4% safe withdrawal rule)</span>
+          </div>
+        </div>
+        <div class="fi-metrics">
+          <div class="fi-metric">
+            <div class="fi-label">FI Number Today</div>
+            <div class="fi-value" id="fi-number">—</div>
+            <div class="fi-meta">25× current annual expense</div>
+          </div>
+          <div class="fi-metric">
+            <div class="fi-label">Years to FI</div>
+            <div class="fi-value" id="years-to-fi">—</div>
+            <div class="fi-meta" id="years-to-fi-meta">At current trajectory</div>
+          </div>
+          <div class="fi-metric">
+            <div class="fi-label">FI Coverage</div>
+            <div class="fi-value" id="fi-coverage-big">—</div>
+            <div class="fi-meta" id="fi-coverage-meta">Of target reached</div>
+          </div>
+          <div class="fi-metric">
+            <div class="fi-label">FI Year</div>
+            <div class="fi-value" id="fi-year">—</div>
+            <div class="fi-meta" id="fi-year-meta">Projected</div>
+          </div>
+        </div>
+        <div class="fi-progress" title="FI Coverage">
+          <div class="fi-progress-bar" id="fi-progress-bar"></div>
+          <div class="fi-progress-label" id="fi-progress-label">0%</div>
+        </div>
+      </section>
+
+      <!-- Secondary investor metrics -->
+      <div class="kpi-grid">
+        <div class="kpi card">
+          <div class="kpi-label">Total Assets</div>
+          <div class="kpi-value" id="kpi-assets">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">Total Liabilities</div>
+          <div class="kpi-value text-danger" id="kpi-liabilities">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">Annual Savings</div>
+          <div class="kpi-value" id="kpi-savings">—</div>
+          <div class="kpi-meta" id="kpi-savings-meta">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">Savings Rate</div>
+          <div class="kpi-value" id="kpi-savings-rate">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">Monthly Outflow (Plan)</div>
+          <div class="kpi-value" id="kpi-monthly-planned">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">This Month Spend</div>
+          <div class="kpi-value" id="kpi-month-spend">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">Plan Variance</div>
+          <div class="kpi-value" id="kpi-variance">—</div>
+        </div>
+        <div class="kpi card">
+          <div class="kpi-label">FI Target Coverage</div>
+          <div class="kpi-value" id="kpi-fi-coverage">—</div>
+          <div class="kpi-meta">25× annual expense rule</div>
+        </div>
+      </div>
+
+      <!-- Liquidity Ladder -->
+      <div class="card">
+        <div class="card-head">
+          <h3>Liquidity Ladder</h3>
+          <span class="card-sub">Where your money is — and how fast you can reach it</span>
+        </div>
+        <div class="liquidity-bar" id="liquidity-bar"></div>
+        <div class="liquidity-legend" id="liquidity-legend"></div>
+        <div class="liquidity-insight" id="liquidity-insight"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Asset Allocation</h3><span class="card-sub">By segment, current balance</span></div>
+          <canvas id="chart-allocation"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Net Worth Composition</h3><span class="card-sub">Assets vs liabilities</span></div>
+          <canvas id="chart-networth"></canvas>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Spend by Category</h3><span class="card-sub">Last 30 days</span></div>
+          <canvas id="chart-spend-cat"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Monthly Trend</h3><span class="card-sub">Last 12 months</span></div>
+          <canvas id="chart-monthly-trend"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVESTMENTS -->
+    <section id="investments" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Investments</h1>
+          <p class="page-sub">All holdings across asset classes</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-investment">+ Add</button>
+          <label class="btn ghost">Import<input type="file" id="import-investments" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-investments">Export</button>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary"><span class="label">Total Invested</span><span class="value" id="inv-total-invested">—</span></div>
+        <div class="summary"><span class="label">Current Value</span><span class="value" id="inv-total-current">—</span></div>
+        <div class="summary"><span class="label">Unrealised Gain</span><span class="value" id="inv-unrealised">—</span></div>
+        <div class="summary"><span class="label">Realised Profit</span><span class="value" id="inv-realised">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>By Asset Class</h3></div>
+        <canvas id="chart-inv-category"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Holdings</h3></div>
+        <div class="table-scroll"><table id="tbl-investments" class="data-table"></table></div>
+      </div>
+    </section>
+
+    <!-- LOANS -->
+    <section id="loans" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Loans</h1>
+          <p class="page-sub">Outstanding debt &amp; EMIs</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-loan">+ Add</button>
+          <label class="btn ghost">Import<input type="file" id="import-loans" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-loans">Export</button>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary"><span class="label">Total Outstanding</span><span class="value" id="loan-total-out">—</span></div>
+        <div class="summary"><span class="label">Total Monthly EMI</span><span class="value" id="loan-total-emi">—</span></div>
+        <div class="summary"><span class="label">Active Loans</span><span class="value" id="loan-active-count">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Loan Details</h3></div>
+        <div class="table-scroll"><table id="tbl-loans" class="data-table"></table></div>
+      </div>
+    </section>
+
+    <!-- REAL ESTATE -->
+    <section id="real-estate" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Real Estate</h1>
+          <p class="page-sub">Properties &amp; valuations</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-property">+ Add</button>
+          <label class="btn ghost">Import<input type="file" id="import-real-estate" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-real-estate">Export</button>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary"><span class="label">Properties</span><span class="value" id="re-count">—</span></div>
+        <div class="summary"><span class="label">Current Value</span><span class="value" id="re-value">—</span></div>
+        <div class="summary"><span class="label">Outstanding Loan</span><span class="value" id="re-loan">—</span></div>
+        <div class="summary"><span class="label">Monthly Rent</span><span class="value" id="re-rent">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Properties</h3></div>
+        <div class="table-scroll"><table id="tbl-real-estate" class="data-table"></table></div>
+      </div>
+    </section>
+
+    <!-- EXPENSES -->
+    <section id="expenses" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Expenses</h1>
+          <p class="page-sub">Transactions, trends, categories</p>
+        </div>
+        <div class="view-actions">
+          <select id="exp-view-mode" class="select">
+            <option value="month">By Month</option>
+            <option value="year">By Year</option>
+            <option value="category">By Category</option>
+            <option value="all">All Transactions</option>
+          </select>
+          <select id="exp-period" class="select"></select>
+          <button class="btn ghost" id="btn-add-txn">+ Add</button>
+          <label class="btn ghost">Import<input type="file" id="import-transactions" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-transactions">Export</button>
+        </div>
+      </div>
+      <div class="summary-row" id="exp-summary"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Category Split</h3></div><canvas id="chart-exp-pie"></canvas></div>
+        <div class="card"><div class="card-head"><h3>Period Trend</h3></div><canvas id="chart-exp-trend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3 id="exp-table-title">Transactions</h3></div>
+        <div class="table-scroll"><table id="tbl-expenses" class="data-table"></table></div>
+      </div>
+    </section>
+
+    <!-- PLANNED VS ACTUAL -->
+    <section id="planned" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Plan vs Actual</h1>
+          <p class="page-sub">Budget adherence &amp; insights</p>
+        </div>
+        <div class="view-actions">
+          <select id="pa-view-mode" class="select">
+            <option value="monthly">Monthly (₹K)</option>
+            <option value="annual">Annual (₹L)</option>
+          </select>
+          <select id="pa-period" class="select"></select>
+          <button class="btn ghost" id="btn-edit-plan">Edit Plan</button>
+          <label class="btn ghost">Import<input type="file" id="import-planned" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-planned">Export</button>
+        </div>
+      </div>
+      <div class="summary-row">
+        <div class="summary"><span class="label">Planned</span><span class="value" id="pa-planned">—</span></div>
+        <div class="summary"><span class="label">Actual</span><span class="value" id="pa-actual">—</span></div>
+        <div class="summary"><span class="label">Variance</span><span class="value" id="pa-variance">—</span></div>
+        <div class="summary"><span class="label">Variance %</span><span class="value" id="pa-variance-pct">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Category Comparison</h3></div>
+        <canvas id="chart-pa-bar"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Detail</h3></div>
+        <div class="table-scroll"><table id="tbl-planned-actual" class="data-table"></table></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Insights</h3><span class="card-sub">Pattern detection &amp; suggestions</span></div>
+        <ul id="suggestions-list" class="suggestions"></ul>
+      </div>
+    </section>
+
+    <!-- STATEMENTS -->
+    <section id="statements" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Statements</h1>
+          <p class="page-sub">Upload PDF &amp; CSV statements</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Credit Card PDF · auto-detect</h3><span class="card-sub">ICICI, SBI, Axis supported</span></div>
+        <p class="muted">Drop a credit card PDF and the parser detects the bank, extracts transactions, auto-categorises them, and lets you review before import.</p>
+        <label class="btn primary upload-cta">
+          <span class="upload-icon">↑</span>
+          <span>Choose PDF</span>
+          <input type="file" id="upload-icici-pdf" accept=".pdf" hidden>
+        </label>
+        <div id="pdf-status" class="muted small"></div>
+        <div id="pdf-preview"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Generic CSV</h3></div>
+          <p class="muted small">Columns: <code>date, merchant, amount, category</code></p>
+          <label class="btn ghost">Choose CSV<input type="file" id="upload-generic-csv" accept=".csv" hidden></label>
+          <div id="csv-status" class="muted small"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Bank Statement</h3></div>
+          <p class="muted small">Columns: <code>date, description, debit, credit, balance</code></p>
+          <label class="btn ghost">Choose CSV<input type="file" id="upload-bank-csv" accept=".csv" hidden></label>
+          <div id="bank-status" class="muted small"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GOALS -->
+    <section id="goals" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Financial Goals</h1>
+          <p class="page-sub">Time-bound milestones · on-track tracking with required-contribution math</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-goal">+ Add Goal</button>
+          <label class="btn ghost">Import<input type="file" id="import-goals" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-goals">Export</button>
+        </div>
+      </div>
+      <div class="summary-row" id="goals-summary"></div>
+      <div id="goals-list"></div>
+    </section>
+
+    <!-- FUTURE PROJECTIONS -->
+    <section id="projections" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Future</h1>
+          <p class="page-sub">Long-term wealth projection</p>
+        </div>
+        <div class="view-actions">
+          <label class="btn ghost">Import Segments<input type="file" id="import-projection-segments" accept=".csv" hidden></label>
+          <button class="btn ghost" id="btn-export-projection-segments">Export Segments</button>
+          <label class="btn ghost">Import Projections<input type="file" id="import-projections" accept=".csv" hidden></label>
+          <button class="btn primary" id="btn-export-projections">Export Projections</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Global Assumptions</h3></div>
+        <div class="form-grid">
+          <label class="field">Default return on net worth (%) <input type="number" id="assump-return" value="8" step="0.5"></label>
+          <label class="field">Inflation reference (%) <input type="number" id="assump-inflation" value="6" step="0.5"></label>
+          <label class="field">Years to project <input type="number" id="assump-years" value="40"></label>
+          <label class="field">Equity → Debt rebalance year <input type="number" id="assump-rebalance-year" value="2049"></label>
+          <label class="field">PF/NPS unlock year (age 60) <input type="number" id="assump-nps-unlock-year" value="2049"></label>
+          <label class="field">NPS annuity portion (%) <input type="number" id="assump-nps-annuity-pct" value="40" min="0" max="100"></label>
+          <button class="btn primary" id="btn-run-projection">Recompute</button>
+          <button class="btn ghost" id="btn-unlock-all-years">Clear Year Locks</button>
+        </div>
+        <p class="muted small" style="margin-top:6px"><b>Milestone rules:</b> At rebalance year, all Equity moves to FD (kills sequence-of-returns risk). At NPS unlock year, Retirement (PF+NPS) splits — 60% to FD, 40% to Pension Annuity (regulatory rule).</p>
+        <div class="toggle-row">
+          <label class="toggle-switch">
+            <input type="checkbox" id="real-return-toggle">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Show in today's purchasing power <span class="muted small">(divide by inflation each year)</span></span>
+          </label>
+        </div>
+        <p class="muted small">Net worth = sum of investment balances (compounded with each category's ROI). Income is NOT added separately — it's assumed already allocated to Investments + Expenses. Cash-flow shortfalls draw down from balances. Click ▶ on any segment to set per-year overrides.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Segments — Income, Investments, Expenses</h3></div>
+        <div id="segments-editor"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Net Worth Projection</h3></div>
+        <canvas id="chart-projection"></canvas>
+      </div>
+
+      <!-- Monte Carlo Simulation -->
+      <div class="card mc-card">
+        <div class="card-head">
+          <h3>Monte Carlo Simulation</h3>
+          <span class="card-sub">Risk under uncertain returns · 200 random paths around each segment's expected ROI</span>
+        </div>
+        <div class="mc-controls">
+          <button class="btn primary" id="btn-run-monte-carlo">Run Simulation</button>
+          <span class="muted small">Default volatility: Equity 18% · Gold 15% · FD 2% · Real Estate 8% · Retirement 4% · Business 30%</span>
+        </div>
+        <div class="mc-kpis" id="mc-kpis"></div>
+        <div class="mc-chart-wrap"><canvas id="chart-monte-carlo"></canvas></div>
+        <div id="mc-explanation" class="mc-verdict"></div>
+        <div id="mc-diagnostics" class="mc-diagnostics"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Year-by-Year Table</h3><span class="card-sub">Click any value to override</span></div>
+        <div class="table-scroll"><table id="tbl-projections" class="data-table"></table></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settings" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Settings</h1>
+          <p class="page-sub">Data storage, import &amp; export</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Data Storage</h3></div>
+        <p class="muted">All data lives in your browser's localStorage. Use Import/Export to sync with CSV files on disk.</p>
+        <div class="row">
+          <button class="btn ghost" id="btn-load-seed">Load Seed Data</button>
+          <button class="btn ghost" id="btn-clear-data">Clear All Data</button>
+          <label class="btn ghost" id="btn-import-all">Import All CSVs<input type="file" id="bulk-import" accept=".csv" multiple hidden></label>
+          <button class="btn primary" id="btn-export-all">Export All CSVs</button>
+        </div>
+        <div class="muted small" id="storage-info"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Bulk Import detail</h3></div>
+        <p class="muted small">Filenames must match: investments.csv, loans.csv, real_estate.csv, transactions.csv, planned_budget.csv, future_projections.csv, projection_segments.csv, reward_targets.csv</p>
+        <div id="bulk-status" class="muted small"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Categories &amp; Cards</h3><span class="card-sub">Manage your taxonomy</span></div>
+        <p class="muted small">These appear as dropdown suggestions when you add transactions. Anything you type that isn't here gets auto-added.</p>
+        <div id="taxonomy-editor"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>About</h3></div>
+        <p class="muted">Static personal wealth dashboard. Runs from <code>file://</code> in any browser. Data in localStorage, CSV import/export to disk.</p>
+      </div>
+    </section>
+
+    </main>
+  </div>
+
+  <!-- Generic Modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Edit</h2>
+        <button class="btn-icon" id="modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn ghost" id="modal-cancel">Cancel</button>
+        <button class="btn primary" id="modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/seed-data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

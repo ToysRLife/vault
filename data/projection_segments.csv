@@ -1,0 +1,18 @@
+id,name,type,monthly_amount,annual_amount,yoy_growth_pct,return_pct,start_year,end_year,current_balance,notes
+1,Salary,income,0,1500000,8,0,2026,2046,0,Annual net salary - edit to your value
+2,Bonus,income,0,600000,8,0,2026,2046,0,Annual bonus
+3,Rental Income,income,0,0,5,0,2030,2090,0,Future rental from properties
+4,Business,investment,0,0,5,12,2026,2046,0,Direct business investments - speculative
+5,Equity,investment,0,60000,8,12,2026,2046,20000,Mutual funds + stocks + ULIP. Aim 12% long-term
+6,FD / Fixed Income,investment,0,300000,5,7.3,2026,2046,1004000,PPF + SSY + RDs combined. PPF/SSY cap at 1.5L each
+7,Gold,investment,0,10000,5,8,2026,2046,3722000,Physical gold + Sovereign Gold Bonds (SGBs)
+8,Retirement (PF + NPS),investment,0,150000,5,9,2026,2046,1232000,EPF + NPS combined contributions
+9,Real Estate,investment,0,258000,0,6,2026,2040,7693000,Home loan EMI principal portion + market appreciation
+10,Living Expenses,expense,72400,0,6,0,2026,2090,0,Grocery + Utilities + Misc monthly recurring
+11,House Rent,expense,35000,0,6,0,2026,2090,0,Rent grows with inflation
+12,Home Loan EMI,expense,21500,0,0,0,2026,2040,0,Fixed EMI until 2040
+13,Personal Loan EMI,expense,8500,0,0,0,2026,2040,0,Fixed EMI until 2040
+14,School Fees,expense,25000,0,8,0,2026,2040,0,Education inflation high - until kid graduates
+15,Travel & Discretionary,expense,0,175000,7,0,2026,2080,0,Annual lumpy travel + shopping
+16,Insurance Premiums,expense,0,90000,5,0,2026,2080,0,Term + Car + Life Insurance etc
+17,Pension Annuity,investment,0,0,0,6,2049,2090,0,Mandatory 40% of NPS at age 60 (low return low vol)

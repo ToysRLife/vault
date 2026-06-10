@@ -1,0 +1,5 @@
+id,property,address,owner,purchase_year,acquired_cost,current_value,outstanding_loan,monthly_rent,notes
+1,Apartment 1,,,2021,3553500,3767500,2100000,0,Example - home loan outstanding
+2,Apartment 2,,,,,,,,Example placeholder
+3,Villa Plot,,,2023,2942043,2942043,0,0,Example - possession received
+4,Farmland,,,2023,795700,983200,0,0,Example - partial payments made

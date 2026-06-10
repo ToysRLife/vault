@@ -1,0 +1,19 @@
+id,category,best_card,monthly_spend,reward_rate_pct,annual_reward_target
+1,Grocery & Utilities,Emerald,14000,3.0,2520
+2,Grocery Bulk,HSBC,10000,1.0,1000
+3,Insurance Payments,Emerald,25500,3.0,765
+4,Medical/Shopping,Emerald,10000,3.0,900
+5,Utilities,Axis,2900,8.0,232
+6,Gold Diwali,Emerald,10000,3.0,900
+7,Education Part 1,Emerald,65000,2.0,1000
+8,La Maintenance,Emerald,39600,3.0,1188
+9,Gold Annual,Emerald,100000,18.0,18000
+10,Ruby Insurance,Emerald,24000,3.0,720
+11,Dining Annual,Emerald,5000,3.0,900
+12,HDFC 30 RD,Emerald,30000,3.0,900
+13,Education Part 2,Emerald,60000,3.0,1000
+14,NPS,Emerald,50000,1.5,750
+15,Fuel,Emerald,36000,0.0,0
+16,Car Insurance + Service,Emerald,24000,3.0,720
+17,Flight,Emerald,50000,18.0,9000
+18,Hotel,Emerald,25000,36.0,9000
