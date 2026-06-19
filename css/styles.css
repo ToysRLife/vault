@@ -853,6 +853,88 @@ input:focus, select:focus, textarea:focus {
 }
 .toggle-label { font-weight: 500; }
 
+/* ---------- Read-only segment cells (Future tab) ---------- */
+.readonly-cell {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-xs);
+  color: var(--text-muted);
+  font-feature-settings: "tnum";
+  font-weight: 500;
+  cursor: help;
+  min-width: 60px;
+  text-align: right;
+}
+.src-link {
+  display: inline-block;
+  padding: 3px 8px;
+  margin-right: 6px;
+  border-radius: var(--r-xs);
+  background: var(--accent-faint);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--t-fast);
+}
+.src-link:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* ---------- Planned Expenses grouped by category ---------- */
+.exp-group {
+  margin-bottom: 22px;
+  padding: 16px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.exp-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.exp-group-head h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.exp-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--bg-3);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-feature-settings: "tnum";
+}
+.exp-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 /* ---------- Welcome card (shown when localStorage is empty) ---------- */
 .welcome-card {
   padding: 40px 32px;

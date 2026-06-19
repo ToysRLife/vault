@@ -291,7 +291,7 @@ const CSV_SCHEMAS = {
   planned_budget: ["id","category","subcategory","monthly","annual","payment_mode","notes"],
   future_projections: ["id","year","age","phase","total_assets_lakh","annual_expense_lakh","annual_income_lakh","net_change_lakh","locked","notes"],
   reward_targets: ["id","category","best_card","monthly_spend","reward_rate_pct","annual_reward_target"],
-  projection_segments: ["id","name","type","monthly_amount","annual_amount","yoy_growth_pct","return_pct","start_year","end_year","current_balance","notes"],
+  projection_segments: ["id","name","type","monthly_amount","annual_amount","yoy_growth_pct","return_pct","start_year","end_year","current_balance","category","notes"],
   projection_segment_yearly: ["id","segment_id","year","annual_amount","return_pct","notes"],
   actual_overrides: ["id","period","category","amount","notes"],
   taxonomy: ["id","type","name","parent","notes"],
@@ -982,15 +982,27 @@ function renderPlannedActual() {
     computedByCat[c] = (computedByCat[c] || 0) + Number(t.amount);
   });
 
-  // Aggregate planned by category — monthly or annual based on mode
-  const plannedField = mode === "annual" ? "annual" : "monthly";
+  // Aggregate planned by category from projection_segments (type=expense) — single source of truth.
+  // The Planned Expenses tab manages these; this view aggregates them by their category.
   const plannedByCat = {};
-  appData.planned_budget.forEach(p => {
-    const c = p.category || "Uncategorized";
-    const v = Number(p[plannedField] || 0)
-      || (mode === "annual" ? Number(p.monthly || 0) * 12 : Number(p.annual || 0) / 12);
+  const expenseSegs = (appData.projection_segments || []).filter(s => s.type === "expense");
+  expenseSegs.forEach(s => {
+    const c = s.category || "Uncategorized";
+    const annualV = effectiveAnnual(s);
+    const v = mode === "annual" ? annualV : annualV / 12;
     plannedByCat[c] = (plannedByCat[c] || 0) + v;
   });
+  // Legacy fallback: if no expense segments exist yet, fall back to the old planned_budget table
+  // so users with pre-restructure data still see something.
+  if (Object.keys(plannedByCat).length === 0 && Array.isArray(appData.planned_budget)) {
+    const plannedField = mode === "annual" ? "annual" : "monthly";
+    appData.planned_budget.forEach(p => {
+      const c = p.category || "Uncategorized";
+      const v = Number(p[plannedField] || 0)
+        || (mode === "annual" ? Number(p.monthly || 0) * 12 : Number(p.annual || 0) / 12);
+      plannedByCat[c] = (plannedByCat[c] || 0) + v;
+    });
+  }
 
   // Apply actual overrides for this period
   const periodOverrides = (appData.actual_overrides || []).filter(o => String(o.period) === String(period));
@@ -1372,11 +1384,224 @@ function renderIncome() {
   renderCashFlowList("income", listEl, summaryEl, { itemsLabel: "Income Sources" });
 }
 
+// User's preferred expense category order
+const EXPENSE_CATEGORY_ORDER = ["Grocery", "Utility", "Health", "Luxury", "Ofc", "Loan", "Annual Expense"];
+
+// Standard category structure that the "Apply Standard Structure" button uses
+const STANDARD_EXPENSE_STRUCTURE = [
+  // Grocery (monthly)
+  { name: "Milk",                   category: "Grocery",        monthly: 4000,  yoy: 6 },
+  { name: "Grocery",                category: "Grocery",        monthly: 10000, yoy: 6 },
+  { name: "Veg",                    category: "Grocery",        monthly: 2000,  yoy: 6 },
+  { name: "Fruits",                 category: "Grocery",        monthly: 5000,  yoy: 6 },
+  { name: "Veg Extra",              category: "Grocery",        monthly: 1000,  yoy: 6 },
+  { name: "Akshaykalpa",            category: "Grocery",        monthly: 1000,  yoy: 6 },
+  { name: "Maid/Car Cleaning",      category: "Grocery",        monthly: 3700,  yoy: 5 },
+  // Utility
+  { name: "IGL",                    category: "Utility",        monthly: 900,   yoy: 6 },
+  { name: "Mobile",                 category: "Utility",        monthly: 250,   yoy: 5 },
+  { name: "Electricity",            category: "Utility",        monthly: 500,   yoy: 5 },
+  { name: "Water",                  category: "Utility",        monthly: 800,   yoy: 5 },
+  { name: "Wifi",                   category: "Utility",        monthly: 1450,  yoy: 5 },
+  // Health
+  { name: "Medicine",               category: "Health",         monthly: 10000, yoy: 7 },
+  { name: "Term Insurance",         category: "Health",         monthly: 5500,  yoy: 5,  end_year: 2080 },
+  // Luxury
+  { name: "Travel",                 category: "Luxury",         annual: 150000, yoy: 7,  end_year: 2080 },
+  { name: "Shopping",               category: "Luxury",         monthly: 6250,  yoy: 7 },
+  { name: "Weekend Munching",       category: "Luxury",         monthly: 2500,  yoy: 6 },
+  // Ofc
+  { name: "Petrol",                 category: "Ofc",            monthly: 4000,  yoy: 6 },
+  { name: "Ofc Lunch",              category: "Ofc",            monthly: 1500,  yoy: 6,  end_year: 2046, notes: "Ends at retirement" },
+  // Loan
+  { name: "Home Loan",              category: "Loan",           monthly: 21500, yoy: 0,  end_year: 2040 },
+  { name: "House Rent",             category: "Loan",           monthly: 35000, yoy: 6,  end_year: 2046 },
+  { name: "Personal Loan",          category: "Loan",           monthly: 8500,  yoy: 0,  end_year: 2040 },
+  // Annual Expense
+  { name: "NPS",                    category: "Annual Expense", annual: 50000,  yoy: 5,  end_year: 2046 },
+  { name: "Car Insurance",          category: "Annual Expense", annual: 12000,  yoy: 5 },
+  { name: "Ruby LIC",               category: "Annual Expense", annual: 24000,  yoy: 5,  end_year: 2046 },
+  { name: "Car Service",            category: "Annual Expense", annual: 12000,  yoy: 6 },
+  { name: "School Fees",            category: "Annual Expense", annual: 300000, yoy: 8,  end_year: 2040 },
+  { name: "Extra Curricular",       category: "Annual Expense", annual: 60000,  yoy: 7,  end_year: 2040 },
+  { name: "La Maintenance",         category: "Annual Expense", annual: 39600,  yoy: 6 }
+];
+
+function applyStandardExpenseStructure() {
+  const existing = (appData.projection_segments || []).filter(s => s.type === "expense");
+  if (existing.length > 0) {
+    if (!confirm(`Replace your ${existing.length} current expense item(s) with the standard category structure (${STANDARD_EXPENSE_STRUCTURE.length} items in ${EXPENSE_CATEGORY_ORDER.length} categories)?\n\nYour income and investment data is NOT affected.`)) return;
+  }
+  // Remove existing expense segments, keep income + investment
+  appData.projection_segments = (appData.projection_segments || []).filter(s => s.type !== "expense");
+  const startYear = new Date().getFullYear();
+  STANDARD_EXPENSE_STRUCTURE.forEach(e => {
+    appData.projection_segments.push({
+      id: nextId(appData.projection_segments),
+      name: e.name,
+      type: "expense",
+      monthly_amount: e.monthly || 0,
+      annual_amount: e.annual || (e.monthly ? e.monthly * 12 : 0),
+      yoy_growth_pct: e.yoy != null ? e.yoy : 6,
+      return_pct: 0,
+      start_year: startYear,
+      end_year: e.end_year || 2090,
+      current_balance: 0,
+      category: e.category,
+      notes: e.notes || ""
+    });
+  });
+  saveAll();
+  renderPlannedExpenses();
+  toast(`Loaded ${STANDARD_EXPENSE_STRUCTURE.length} expense items across ${EXPENSE_CATEGORY_ORDER.length} categories. Edit amounts to match your situation.`);
+}
+
 function renderPlannedExpenses() {
   const listEl = $("#planned-expenses-list");
   const summaryEl = $("#planned-exp-summary");
   if (!listEl || !summaryEl) return;
-  renderCashFlowList("expense", listEl, summaryEl, { itemsLabel: "Expense Items" });
+
+  const segs = (appData.projection_segments || []).filter(s => s.type === "expense");
+
+  // Summary
+  const totalAnnual = segs.reduce((sum, s) => sum + effectiveAnnual(s), 0);
+  const activeNow = segs.filter(s => {
+    const sy = Number(s.start_year) || 0;
+    const ey = Number(s.end_year) || 9999;
+    const y = new Date().getFullYear();
+    return y >= sy && y <= ey && effectiveAnnual(s) > 0;
+  });
+  summaryEl.innerHTML = `
+    <div class="summary"><span class="label">Items</span><span class="value">${segs.length}</span></div>
+    <div class="summary"><span class="label">Active this year</span><span class="value">${activeNow.length}</span></div>
+    <div class="summary"><span class="label">Annual Expense</span><span class="value">${fmtINR(totalAnnual)}</span></div>
+    <div class="summary"><span class="label">Monthly equivalent</span><span class="value">${fmtINR(totalAnnual / 12)}</span></div>
+  `;
+
+  if (segs.length === 0) {
+    listEl.innerHTML = `
+      <div class="muted" style="padding:30px;text-align:center">
+        <p>No expense items yet.</p>
+        <button class="btn primary" id="btn-apply-exp-structure-empty">Apply Standard Category Structure</button>
+        <p class="small" style="margin-top:8px">Loads 29 sample items across 7 categories (Grocery, Utility, Health, Luxury, Ofc, Loan, Annual Expense). Edit amounts after loading.</p>
+      </div>
+    `;
+    $("#btn-apply-exp-structure-empty")?.addEventListener("click", applyStandardExpenseStructure);
+    return;
+  }
+
+  // Group by category
+  const groups = {};
+  segs.forEach(s => {
+    const cat = s.category || "Other";
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(s);
+  });
+  const orderedCats = [
+    ...EXPENSE_CATEGORY_ORDER.filter(c => groups[c]),
+    ...Object.keys(groups).filter(c => !EXPENSE_CATEGORY_ORDER.includes(c)).sort()
+  ];
+
+  listEl.innerHTML = orderedCats.map(cat => {
+    const items = groups[cat] || [];
+    const catTotal = items.reduce((sum, s) => sum + effectiveAnnual(s), 0);
+    return `
+      <div class="exp-group">
+        <div class="exp-group-head">
+          <h4>${escapeHtml(cat)} <span class="exp-group-count">${items.length}</span></h4>
+          <div class="exp-group-meta">
+            <span class="muted small">Annual ${fmtINR(catTotal)} · Monthly ${fmtINR(catTotal / 12)}</span>
+            <button class="btn btn-sm" data-add-cat="${escapeHtml(cat)}">+ Add to ${escapeHtml(cat)}</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table seg-table">
+            <thead><tr>
+              <th>Sub-category</th>
+              <th class="num">Monthly ₹L</th>
+              <th class="num">Annual ₹L</th>
+              <th class="num">YoY %</th>
+              <th class="num">Start</th>
+              <th class="num">End</th>
+              <th>Notes</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              ${items.map(s => `
+                <tr data-seg-id="${s.id}">
+                  <td><input type="text" data-field="name" value="${escapeHtml(s.name || '')}"></td>
+                  <td><input type="number" step="0.001" class="num" data-field="monthly_amount" data-lakh="1" value="${toLakh(s.monthly_amount, 3)}"></td>
+                  <td><input type="number" step="0.01" class="num" data-field="annual_amount" data-lakh="1" value="${toLakh(s.annual_amount)}"></td>
+                  <td><input type="number" step="0.5" class="num" data-field="yoy_growth_pct" value="${s.yoy_growth_pct || 0}"></td>
+                  <td><input type="number" class="num" data-field="start_year" value="${s.start_year || ''}"></td>
+                  <td><input type="number" class="num" data-field="end_year" value="${s.end_year || ''}"></td>
+                  <td><input type="text" data-field="notes" value="${escapeHtml(s.notes || '')}"></td>
+                  <td class="actions"><button class="btn-mini danger" data-del-cf="${s.id}">×</button></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Wire inputs (reuse same change logic)
+  listEl.querySelectorAll(`tr[data-seg-id] input[data-field]`).forEach(inp => {
+    inp.addEventListener("change", () => {
+      const tr = inp.closest("tr");
+      const id = tr.dataset.segId;
+      const seg = appData.projection_segments.find(s => String(s.id) === String(id));
+      if (!seg) return;
+      const f = inp.dataset.field;
+      let v = inp.value;
+      if (f !== "name" && f !== "notes" && f !== "category") v = Number(v) || 0;
+      if (inp.dataset.lakh === "1") v = v * 100000;
+      seg[f] = v;
+      if (f === "monthly_amount") {
+        seg.annual_amount = Number(v) * 12;
+        const a = tr.querySelector('[data-field="annual_amount"]');
+        if (a) a.value = toLakh(seg.annual_amount);
+      } else if (f === "annual_amount") {
+        seg.monthly_amount = Number(v) / 12;
+        const m = tr.querySelector('[data-field="monthly_amount"]');
+        if (m) m.value = toLakh(seg.monthly_amount, 3);
+      }
+      saveAll();
+      // Lightweight re-render to update summary + group totals
+      renderPlannedExpenses();
+    });
+  });
+  listEl.querySelectorAll("[data-del-cf]").forEach(btn => {
+    btn.onclick = () => {
+      if (!confirm("Delete this expense item?")) return;
+      const id = btn.dataset.delCf;
+      appData.projection_segments = appData.projection_segments.filter(s => String(s.id) !== String(id));
+      saveAll();
+      renderPlannedExpenses();
+    };
+  });
+  listEl.querySelectorAll("[data-add-cat]").forEach(btn => {
+    btn.onclick = () => {
+      const cat = btn.dataset.addCat;
+      appData.projection_segments.push({
+        id: nextId(appData.projection_segments),
+        name: "New item",
+        type: "expense",
+        monthly_amount: 0,
+        annual_amount: 0,
+        yoy_growth_pct: 6,
+        return_pct: 0,
+        start_year: new Date().getFullYear(),
+        end_year: 2090,
+        current_balance: 0,
+        category: cat,
+        notes: ""
+      });
+      saveAll();
+      renderPlannedExpenses();
+    };
+  });
 }
 
 function addCashFlowItem(type, name) {
@@ -1799,17 +2024,27 @@ function renderSegmentsEditor() {
     const isInvest = s.type === "investment";
     const isMaster = /salary/i.test(s.name || "");
     const isExpanded = String(s.id) === String(expandedSegmentId);
+    // Read-only on Future tab — amounts/balances are edited in source tabs
     const baseCols = isInvest ? `
-      <td><input type="number" step="0.01" class="num" data-field="current_balance" data-lakh="1" value="${toLakh(s.current_balance)}"></td>
-      <td><input type="number" step="0.01" class="num" data-field="annual_amount" data-lakh="1" value="${toLakh(s.annual_amount)}"></td>
+      <td><span class="num readonly-cell" title="Edit in Investments / Real Estate tab">${toLakh(s.current_balance)}</span></td>
+      <td><span class="num readonly-cell" title="Edit in Investments tab">${toLakh(s.annual_amount)}</span></td>
       <td><input type="number" class="num" step="0.1" data-field="return_pct" value="${s.return_pct || 0}"></td>
       <td><input type="number" class="num" step="0.5" data-field="yoy_growth_pct" value="${s.yoy_growth_pct || 0}"></td>
     ` : `
-      <td><input type="number" step="0.001" class="num" data-field="monthly_amount" data-lakh="1" value="${toLakh(s.monthly_amount, 3)}"></td>
-      <td><input type="number" step="0.01" class="num" data-field="annual_amount" data-lakh="1" value="${toLakh(s.annual_amount)}"></td>
+      <td><span class="num readonly-cell" title="Edit in ${s.type === 'income' ? 'Income' : 'Planned Expenses'} tab">${toLakh(s.monthly_amount, 3)}</span></td>
+      <td><span class="num readonly-cell" title="Edit in ${s.type === 'income' ? 'Income' : 'Planned Expenses'} tab">${toLakh(s.annual_amount)}</span></td>
       <td><input type="number" class="num" step="0.5" data-field="yoy_growth_pct" value="${s.yoy_growth_pct || 0}"></td>
     `;
     const colspan = isInvest ? 8 : 7;
+    // Source tab link
+    const sourceTab = s.type === "income" ? "income"
+                    : s.type === "expense" ? "planned-expenses"
+                    : /real\s*estate/i.test(s.name || "") ? "real-estate"
+                    : "investments";
+    const sourceLabel = sourceTab === "income" ? "Income"
+                      : sourceTab === "planned-expenses" ? "Planned Expenses"
+                      : sourceTab === "real-estate" ? "Real Estate"
+                      : "Investments";
     const masterTag = isMaster ? `<span class="master-tag" title="Salary start/end drives Bonus and all Investment segments">MASTER</span>` : '';
     return `
       <tr data-seg-id="${s.id}" class="seg-base-row ${isExpanded ? 'expanded' : ''} ${isMaster ? 'is-master' : ''}">
@@ -1821,7 +2056,10 @@ function renderSegmentsEditor() {
         ${baseCols}
         <td><input type="number" class="num" data-field="start_year" value="${s.start_year || ''}"></td>
         <td><input type="number" class="num" data-field="end_year" value="${s.end_year || ''}"></td>
-        <td class="actions"><button class="btn-mini danger" data-del-seg="${s.id}">×</button></td>
+        <td class="actions">
+          <a class="src-link" data-jump-tab="${sourceTab}" title="Edit amounts in source tab">↗ ${sourceLabel}</a>
+          <button class="btn-mini danger" data-del-seg="${s.id}">×</button>
+        </td>
       </tr>
       ${isExpanded ? `<tr class="seg-detail-row"><td colspan="${colspan}">${renderYearDetail(s)}</td></tr>` : ''}
     `;
@@ -3241,22 +3479,7 @@ function wireUI() {
     renderPlannedExpenses();
     toast("Expense item added — fill in monthly or annual amount");
   });
-  wire("#btn-load-sample-expense", () => {
-    if (window.EMBEDDED_SEED?.projection_segments) {
-      const rows = parseCSV(window.EMBEDDED_SEED.projection_segments);
-      coerceNumeric("projection_segments", rows);
-      const expRows = rows.filter(r => r.type === "expense");
-      expRows.forEach(r => {
-        if (!appData.projection_segments.some(s => s.name === r.name && s.type === "expense")) {
-          r.id = nextId(appData.projection_segments);
-          appData.projection_segments.push(r);
-        }
-      });
-      saveAll();
-      renderPlannedExpenses();
-      toast(`Loaded ${expRows.length} sample expense items`);
-    }
-  });
+  wire("#btn-apply-exp-structure", applyStandardExpenseStructure);
 
   // Sync Investment balances from Investments + Real Estate tabs
   wire("#btn-sync-investments", () => {
