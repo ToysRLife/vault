@@ -29,7 +29,9 @@
       <a class="nav-item" data-tab="investments"><span class="nav-icon">◈</span><span>Investments</span></a>
       <a class="nav-item" data-tab="loans"><span class="nav-icon">⊟</span><span>Loans</span></a>
       <a class="nav-item" data-tab="real-estate"><span class="nav-icon">▣</span><span>Real Estate</span></a>
+      <a class="nav-item" data-tab="income"><span class="nav-icon">⇡</span><span>Income</span></a>
       <div class="nav-divider"></div>
+      <a class="nav-item" data-tab="planned-expenses"><span class="nav-icon">⊕</span><span>Planned Expenses</span></a>
       <a class="nav-item" data-tab="expenses"><span class="nav-icon">≡</span><span>Expenses</span></a>
       <a class="nav-item" data-tab="planned"><span class="nav-icon">◇</span><span>Plan vs Actual</span></a>
       <a class="nav-item" data-tab="statements"><span class="nav-icon">↑</span><span>Statements</span></a>
@@ -302,6 +304,44 @@
       </div>
     </section>
 
+    <!-- INCOME (source of truth for income projection) -->
+    <section id="income" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Income</h1>
+          <p class="page-sub">Salary, bonus, rental and other inflows. Drives the Future tab's income projection.</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-income">+ Add Income Source</button>
+          <button class="btn ghost" id="btn-load-sample-income">Load Sample</button>
+        </div>
+      </div>
+      <div class="summary-row" id="income-summary"></div>
+      <div class="card">
+        <div class="card-head"><h3>Income Sources</h3><span class="card-sub">Each row supports monthly OR annual entry · auto-syncs both</span></div>
+        <div id="income-list"></div>
+      </div>
+    </section>
+
+    <!-- PLANNED EXPENSES (source of truth for expense projection) -->
+    <section id="planned-expenses" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Planned Expenses</h1>
+          <p class="page-sub">Living costs, EMIs, premiums and lifestyle spending. Drives the Future tab's expense projection.</p>
+        </div>
+        <div class="view-actions">
+          <button class="btn ghost" id="btn-add-planned-expense">+ Add Expense</button>
+          <button class="btn ghost" id="btn-load-sample-expense">Load Sample</button>
+        </div>
+      </div>
+      <div class="summary-row" id="planned-exp-summary"></div>
+      <div class="card">
+        <div class="card-head"><h3>Expense Items</h3><span class="card-sub">Each row supports monthly OR annual entry · YoY growth + start/end year for accurate projection</span></div>
+        <div id="planned-expenses-list"></div>
+      </div>
+    </section>
+
     <!-- EXPENSES -->
     <section id="expenses" class="view">
       <div class="page-header">
@@ -460,7 +500,14 @@
         <p class="muted small">Net worth = sum of investment balances (compounded with each category's ROI). Income is NOT added separately — it's assumed already allocated to Investments + Expenses. Cash-flow shortfalls draw down from balances. Click ▶ on any segment to set per-year overrides.</p>
       </div>
       <div class="card">
-        <div class="card-head"><h3>Segments — Income, Investments, Expenses</h3></div>
+        <div class="card-head">
+          <h3>Segments — Income, Investments, Expenses</h3>
+          <span class="card-sub">Income managed in <a href="#" data-jump-tab="income">Income tab</a> · Expenses managed in <a href="#" data-jump-tab="planned-expenses">Planned Expenses tab</a> · Investment balances aggregated from <a href="#" data-jump-tab="investments">Investments</a> + <a href="#" data-jump-tab="real-estate">Real Estate</a></span>
+        </div>
+        <div class="row" style="margin-bottom:14px">
+          <button class="btn ghost" id="btn-sync-investments">↻ Sync Investment Balances from Holdings</button>
+          <span class="muted small" style="align-self:center">Recomputes Equity/FD/Gold/Retirement/Real Estate balances by summing the underlying holdings.</span>
+        </div>
         <div id="segments-editor"></div>
       </div>
       <div class="card">

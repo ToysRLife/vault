@@ -382,20 +382,29 @@ async function loadSeed() {
 
 /* -------------------- Tabs -------------------- */
 function initTabs() {
+  const goToTab = (tab) => {
+    $$(".nav-item").forEach(b => b.classList.remove("active"));
+    $$(".view").forEach(v => v.classList.remove("active"));
+    const navItem = document.querySelector(`.nav-item[data-tab="${tab}"]`);
+    if (navItem) navItem.classList.add("active");
+    const sec = document.getElementById(tab);
+    if (sec) sec.classList.add("active");
+    updateTopbarTitle(tab);
+    renderTab(tab);
+    document.body.classList.remove("drawer-open");
+  };
   $$(".nav-item[data-tab]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
-      $$(".nav-item").forEach(b => b.classList.remove("active"));
-      $$(".view").forEach(v => v.classList.remove("active"));
-      btn.classList.add("active");
-      const tab = btn.dataset.tab;
-      const sec = document.getElementById(tab);
-      if (sec) sec.classList.add("active");
-      updateTopbarTitle(tab);
-      renderTab(tab);
-      // Auto-close mobile drawer after navigation
-      document.body.classList.remove("drawer-open");
+      goToTab(btn.dataset.tab);
     });
+  });
+  // Wire any [data-jump-tab] anchors (cross-references between tabs)
+  document.body.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-jump-tab]");
+    if (!a) return;
+    e.preventDefault();
+    goToTab(a.dataset.jumpTab);
   });
 }
 
@@ -429,6 +438,8 @@ function renderTab(name) {
     case "expenses": renderExpenses(); break;
     case "planned": renderPlannedActual(); break;
     case "statements": /* static */ break;
+    case "income": renderIncome(); break;
+    case "planned-expenses": renderPlannedExpenses(); break;
     case "goals": renderGoals(); break;
     case "projections": renderProjections(); break;
     case "settings": updateStorageInfo(); renderTaxonomyEditor(); break;
@@ -1264,7 +1275,129 @@ function renderLiquidityLadder(investmentSegs, monthlyExpense) {
   insight.innerHTML = insights.length ? insights.join("<br>") : "✓ Liquidity distribution looks healthy.";
 }
 
-/* -------------------- Goals -------------------- */
+/* -------------------- Income tab -------------------- */
+function renderCashFlowList(type, listEl, summaryEl, opts = {}) {
+  const segs = (appData.projection_segments || []).filter(s => s.type === type);
+  const totalAnnual = segs.reduce((sum, s) => sum + effectiveAnnual(s), 0);
+  const activeNow = segs.filter(s => {
+    const sy = Number(s.start_year) || 0;
+    const ey = Number(s.end_year) || 9999;
+    const y = new Date().getFullYear();
+    return y >= sy && y <= ey && effectiveAnnual(s) > 0;
+  });
+  summaryEl.innerHTML = `
+    <div class="summary"><span class="label">${opts.itemsLabel || 'Items'}</span><span class="value">${segs.length}</span></div>
+    <div class="summary"><span class="label">Active this year</span><span class="value">${activeNow.length}</span></div>
+    <div class="summary"><span class="label">Annual ${type === 'income' ? 'Income' : 'Expense'}</span><span class="value">${fmtINR(totalAnnual)}</span></div>
+    <div class="summary"><span class="label">Monthly equivalent</span><span class="value">${fmtINR(totalAnnual / 12)}</span></div>
+  `;
+
+  if (segs.length === 0) {
+    listEl.innerHTML = `<div class="muted" style="padding:20px;text-align:center">No ${type} items yet. Click <b>+ Add</b> above or <b>Load Sample</b> to start.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = `
+    <div class="table-scroll">
+      <table class="data-table seg-table">
+        <thead><tr>
+          <th>Name</th>
+          <th class="num">Monthly ₹L</th>
+          <th class="num">Annual ₹L</th>
+          <th class="num">YoY %</th>
+          <th class="num">Start</th>
+          <th class="num">End</th>
+          <th>Notes</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${segs.map(s => `
+            <tr data-seg-id="${s.id}">
+              <td><input type="text" data-field="name" value="${escapeHtml(s.name || '')}"></td>
+              <td><input type="number" step="0.001" class="num" data-field="monthly_amount" data-lakh="1" value="${toLakh(s.monthly_amount, 3)}"></td>
+              <td><input type="number" step="0.01" class="num" data-field="annual_amount" data-lakh="1" value="${toLakh(s.annual_amount)}"></td>
+              <td><input type="number" step="0.5" class="num" data-field="yoy_growth_pct" value="${s.yoy_growth_pct || 0}"></td>
+              <td><input type="number" class="num" data-field="start_year" value="${s.start_year || ''}"></td>
+              <td><input type="number" class="num" data-field="end_year" value="${s.end_year || ''}"></td>
+              <td><input type="text" data-field="notes" value="${escapeHtml(s.notes || '')}"></td>
+              <td class="actions"><button class="btn-mini danger" data-del-cf="${s.id}">×</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  listEl.querySelectorAll(`tr[data-seg-id] input[data-field]`).forEach(inp => {
+    inp.addEventListener("change", () => {
+      const tr = inp.closest("tr");
+      const id = tr.dataset.segId;
+      const seg = appData.projection_segments.find(s => String(s.id) === String(id));
+      if (!seg) return;
+      const f = inp.dataset.field;
+      let v = inp.value;
+      if (f !== "name" && f !== "notes") v = Number(v) || 0;
+      if (inp.dataset.lakh === "1") v = v * 100000;
+      seg[f] = v;
+      // Auto-sync monthly <-> annual
+      if (f === "monthly_amount") {
+        seg.annual_amount = Number(v) * 12;
+        const a = tr.querySelector('[data-field="annual_amount"]');
+        if (a) a.value = toLakh(seg.annual_amount);
+      } else if (f === "annual_amount") {
+        seg.monthly_amount = Number(v) / 12;
+        const m = tr.querySelector('[data-field="monthly_amount"]');
+        if (m) m.value = toLakh(seg.monthly_amount, 3);
+      }
+      saveAll();
+      // Re-render summary (cheap)
+      renderCashFlowList(type, listEl, summaryEl, opts);
+    });
+  });
+  listEl.querySelectorAll("[data-del-cf]").forEach(btn => {
+    btn.onclick = () => {
+      if (!confirm("Delete this item?")) return;
+      const id = btn.dataset.delCf;
+      appData.projection_segments = appData.projection_segments.filter(s => String(s.id) !== String(id));
+      saveAll();
+      renderCashFlowList(type, listEl, summaryEl, opts);
+    };
+  });
+}
+
+function renderIncome() {
+  const listEl = $("#income-list");
+  const summaryEl = $("#income-summary");
+  if (!listEl || !summaryEl) return;
+  renderCashFlowList("income", listEl, summaryEl, { itemsLabel: "Income Sources" });
+}
+
+function renderPlannedExpenses() {
+  const listEl = $("#planned-expenses-list");
+  const summaryEl = $("#planned-exp-summary");
+  if (!listEl || !summaryEl) return;
+  renderCashFlowList("expense", listEl, summaryEl, { itemsLabel: "Expense Items" });
+}
+
+function addCashFlowItem(type, name) {
+  const startY = new Date().getFullYear();
+  appData.projection_segments.push({
+    id: nextId(appData.projection_segments),
+    name: name || "New " + type,
+    type,
+    monthly_amount: 0,
+    annual_amount: 0,
+    yoy_growth_pct: type === "income" ? 8 : 6,
+    return_pct: 0,
+    start_year: startY,
+    end_year: type === "income" ? 2046 : 2090,
+    current_balance: 0,
+    notes: ""
+  });
+  saveAll();
+}
+
+/* -------- Goals -------- */
 function computeGoalStatus(g) {
   const currentYear = new Date().getFullYear();
   const years = Math.max(0, Number(g.target_year) - currentYear);
@@ -2011,6 +2144,46 @@ function updateSegmentGroupTotals() {
         : `${label} (${segs.length}) · Base annual ${fmtINR(total)}`;
     }
   });
+}
+
+/* -------- Sync investment balances from holdings (Investments + Real Estate tabs) -------- */
+// Each Future-tab investment segment's current_balance is recomputed by aggregating
+// the granular holdings from the Investments tab (by category) and Real Estate tab (sum).
+function syncInvestmentBalancesFromHoldings() {
+  let updated = 0;
+  const segments = appData.projection_segments || [];
+
+  // Map: segment name pattern → category match in investments table
+  // Investments tab categories: Equity, FD, Gold, Retirement, Business
+  const categoryMap = [
+    { segPattern: /^business$/i,                  invCat: /^business$/i },
+    { segPattern: /^equity$/i,                    invCat: /^equity$/i },
+    { segPattern: /fd|fixed\s*income/i,           invCat: /^fd$/i },
+    { segPattern: /^gold$/i,                      invCat: /^gold$/i },
+    { segPattern: /retirement|pf\s*\+\s*nps/i,    invCat: /^retirement$/i }
+  ];
+
+  categoryMap.forEach(({ segPattern, invCat }) => {
+    const seg = segments.find(s => s.type === "investment" && segPattern.test(s.name || ""));
+    if (!seg) return;
+    const totalRupees = (appData.investments || [])
+      .filter(inv => invCat.test(inv.category || ""))
+      .reduce((sum, inv) => sum + Number(inv.current_value_lakh || 0) * 100000, 0);
+    seg.current_balance = totalRupees;
+    updated++;
+  });
+
+  // Real Estate: aggregate property current_value (minus outstanding_loan? user choice — using gross value here to match Real Estate segment semantics)
+  const reSeg = segments.find(s => s.type === "investment" && /real\s*estate/i.test(s.name || ""));
+  if (reSeg) {
+    const reTotal = (appData.real_estate || [])
+      .reduce((sum, p) => sum + Number(p.current_value || 0), 0);
+    reSeg.current_balance = reTotal;
+    updated++;
+  }
+
+  saveAll();
+  return { updated };
 }
 
 /* -------- Milestone rebalancing helpers -------- */
@@ -3038,6 +3211,59 @@ function wireUI() {
   wire("#btn-edit-plan", () => openPlanEditor());
   wire("#btn-add-proj", () => openEditModal("future_projections", null));
   wire("#btn-add-goal", () => openEditModal("goals", null));
+
+  // Income tab buttons
+  wire("#btn-add-income", () => {
+    addCashFlowItem("income", "New Income");
+    renderIncome();
+    toast("Income source added — fill in monthly or annual amount");
+  });
+  wire("#btn-load-sample-income", () => {
+    if (window.EMBEDDED_SEED?.projection_segments) {
+      const rows = parseCSV(window.EMBEDDED_SEED.projection_segments);
+      coerceNumeric("projection_segments", rows);
+      const incomeRows = rows.filter(r => r.type === "income");
+      incomeRows.forEach(r => {
+        if (!appData.projection_segments.some(s => s.name === r.name && s.type === "income")) {
+          r.id = nextId(appData.projection_segments);
+          appData.projection_segments.push(r);
+        }
+      });
+      saveAll();
+      renderIncome();
+      toast(`Loaded ${incomeRows.length} sample income sources`);
+    }
+  });
+
+  // Planned Expenses tab buttons
+  wire("#btn-add-planned-expense", () => {
+    addCashFlowItem("expense", "New Expense");
+    renderPlannedExpenses();
+    toast("Expense item added — fill in monthly or annual amount");
+  });
+  wire("#btn-load-sample-expense", () => {
+    if (window.EMBEDDED_SEED?.projection_segments) {
+      const rows = parseCSV(window.EMBEDDED_SEED.projection_segments);
+      coerceNumeric("projection_segments", rows);
+      const expRows = rows.filter(r => r.type === "expense");
+      expRows.forEach(r => {
+        if (!appData.projection_segments.some(s => s.name === r.name && s.type === "expense")) {
+          r.id = nextId(appData.projection_segments);
+          appData.projection_segments.push(r);
+        }
+      });
+      saveAll();
+      renderPlannedExpenses();
+      toast(`Loaded ${expRows.length} sample expense items`);
+    }
+  });
+
+  // Sync Investment balances from Investments + Real Estate tabs
+  wire("#btn-sync-investments", () => {
+    const result = syncInvestmentBalancesFromHoldings();
+    renderProjections();
+    toast(`Synced ${result.updated} investment categor${result.updated === 1 ? 'y' : 'ies'} from holdings + Real Estate`);
+  });
   const goalsImp = $("#import-goals");
   if (goalsImp) goalsImp.onchange = e => { if (e.target.files[0]) importTable("goals", e.target.files[0]); };
   wire("#btn-export-goals", () => exportTable("goals"));
