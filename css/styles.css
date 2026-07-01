@@ -1515,6 +1515,15 @@ input:focus, select:focus, textarea:focus {
   font-style: normal;
 }
 
+/* ---------- Plan vs Actual: category mapping note ---------- */
+.pa-map-note {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 2px;
+  font-style: italic;
+}
+
 /* ---------- Editable Actual column in Plan vs Actual ---------- */
 .actual-input {
   width: 100%;

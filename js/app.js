@@ -112,6 +112,7 @@ const appData = {
   actual_overrides: [],
   taxonomy: [],
   goals: [],
+  nw_snapshots: [],
   assumptions: {
     return_pct: 8,
     inflation_pct: 6,
@@ -295,7 +296,8 @@ const CSV_SCHEMAS = {
   projection_segment_yearly: ["id","segment_id","year","annual_amount","return_pct","notes"],
   actual_overrides: ["id","period","category","amount","notes"],
   taxonomy: ["id","type","name","parent","notes"],
-  goals: ["id","name","target_year","target_amount","current_allocation","monthly_contribution","expected_return_pct","priority","linked_segment","notes"]
+  goals: ["id","name","target_year","target_amount","current_allocation","monthly_contribution","expected_return_pct","priority","linked_segment","notes"],
+  nw_snapshots: ["id","date","net_worth","total_assets","total_liabilities","notes"]
 };
 
 function exportTable(name) {
@@ -329,7 +331,8 @@ function coerceNumeric(name, rows) {
     projection_segments: ["monthly_amount","annual_amount","yoy_growth_pct","return_pct","start_year","end_year","current_balance"],
     projection_segment_yearly: ["segment_id","year","annual_amount","return_pct"],
     actual_overrides: ["amount"],
-    goals: ["target_year","target_amount","current_allocation","monthly_contribution","expected_return_pct"]
+    goals: ["target_year","target_amount","current_allocation","monthly_contribution","expected_return_pct"],
+    nw_snapshots: ["net_worth","total_assets","total_liabilities"]
   }[name] || [];
   rows.forEach(r => {
     numFields.forEach(f => {
@@ -744,6 +747,9 @@ function renderDashboard() {
   // Liquidity Ladder
   renderLiquidityLadder(investmentSegs, monthlyExpense);
 
+  // Historical Net Worth chart
+  renderNetWorthHistory();
+
   // Asset Allocation pie — sourced from Future tab investment segments (current_balance)
   const nonZero = investmentSegs.filter(s => Number(s.current_balance || 0) > 0);
   makeChart("chart-allocation", "doughnut", {
@@ -958,6 +964,33 @@ function populateExpensePeriod(mode) {
 }
 
 /* -------------------- Planned vs Actual -------------------- */
+// Maps a Planned-expense category (from Planned Expenses tab) to the transaction
+// taxonomy categories that should feed its "Actual" number.
+// User can override in-place via the Settings taxonomy editor by renaming, but
+// this default handles the common case where planned buckets aggregate multiple
+// transaction categories.
+const PLANNED_CATEGORY_MAPPING = {
+  "Grocery":        ["Grocery"],
+  "Utility":        ["Utility"],
+  "Health":         ["Medical"],
+  "Luxury":         ["Travel", "Entertainment", "Shopping"],
+  "Ofc":            ["Fuel", "Dining"],
+  "Loan":           ["Loan", "Rent"],
+  "Annual Expense": ["Insurance", "SIP", "Education", "Service", "Maid", "Investment"]
+};
+function txnCatsMatchingPlanned(plannedCat) {
+  const cleaned = (plannedCat || "").trim();
+  if (!cleaned) return [];
+  if (PLANNED_CATEGORY_MAPPING[cleaned]) return PLANNED_CATEGORY_MAPPING[cleaned];
+  return [cleaned]; // default: same name
+}
+function isTxnMappedToAnyPlanned(txnCat, plannedCats) {
+  const c = (txnCat || "").toLowerCase();
+  return plannedCats.some(pc =>
+    txnCatsMatchingPlanned(pc).some(m => m.toLowerCase() === c)
+  );
+}
+
 function findActualOverride(period, category) {
   return (appData.actual_overrides || []).find(o =>
     String(o.period) === String(period) && String(o.category) === String(category)
@@ -975,15 +1008,7 @@ function renderPlannedActual() {
     mode === "annual" ? yearKey(t.date) === period : monthKey(t.date) === period
   );
 
-  // Compute actual from transactions
-  const computedByCat = {};
-  txns.forEach(t => {
-    const c = t.category || "Uncategorized";
-    computedByCat[c] = (computedByCat[c] || 0) + Number(t.amount);
-  });
-
   // Aggregate planned by category from projection_segments (type=expense) — single source of truth.
-  // The Planned Expenses tab manages these; this view aggregates them by their category.
   const plannedByCat = {};
   const expenseSegs = (appData.projection_segments || []).filter(s => s.type === "expense");
   expenseSegs.forEach(s => {
@@ -992,8 +1017,6 @@ function renderPlannedActual() {
     const v = mode === "annual" ? annualV : annualV / 12;
     plannedByCat[c] = (plannedByCat[c] || 0) + v;
   });
-  // Legacy fallback: if no expense segments exist yet, fall back to the old planned_budget table
-  // so users with pre-restructure data still see something.
   if (Object.keys(plannedByCat).length === 0 && Array.isArray(appData.planned_budget)) {
     const plannedField = mode === "annual" ? "annual" : "monthly";
     appData.planned_budget.forEach(p => {
@@ -1003,6 +1026,21 @@ function renderPlannedActual() {
       plannedByCat[c] = (plannedByCat[c] || 0) + v;
     });
   }
+  const plannedCatsList = Object.keys(plannedByCat);
+
+  // Aggregate actual using PLANNED_CATEGORY_MAPPING so "Health" pulls in "Medical"
+  // transactions, "Luxury" pulls in Travel+Entertainment+Shopping, etc.
+  // Transactions with categories that don't map to ANY planned category are kept
+  // under their original name (they'll surface as UNPLANNED rows).
+  const computedByCat = {};
+  txns.forEach(t => {
+    const txnCat = t.category || "Uncategorized";
+    const targetPlanned = plannedCatsList.find(pc =>
+      txnCatsMatchingPlanned(pc).some(m => m.toLowerCase() === txnCat.toLowerCase())
+    );
+    const bucket = targetPlanned || txnCat;
+    computedByCat[bucket] = (computedByCat[bucket] || 0) + Number(t.amount);
+  });
 
   // Apply actual overrides for this period
   const periodOverrides = (appData.actual_overrides || []).filter(o => String(o.period) === String(period));
@@ -1066,9 +1104,16 @@ function renderPlannedActual() {
       <th class="actions"></th>
     </tr></thead>
     <tbody>
-      ${rows.map(r => `
+      ${rows.map(r => {
+        const mappedCats = PLANNED_CATEGORY_MAPPING[r.category];
+        const isAggregated = mappedCats && mappedCats.length > 0 &&
+          !(mappedCats.length === 1 && mappedCats[0] === r.category);
+        const mapNote = isAggregated
+          ? `<div class="pa-map-note">← ${mappedCats.join(', ')}</div>`
+          : '';
+        return `
         <tr data-category="${escapeHtml(r.category)}" ${r.isOverridden ? 'class="actual-overridden"' : ''}>
-          <td>${escapeHtml(r.category)}</td>
+          <td>${escapeHtml(r.category)}${mapNote}</td>
           <td class="num">${fmtScale(r.planned, scale)}</td>
           <td class="num">
             <input type="number" step="${scaleStep}" class="actual-input ${r.isOverridden ? 'overridden' : ''}"
@@ -1081,8 +1126,8 @@ function renderPlannedActual() {
           <td class="num ${r.variance > 0 ? 'diff-over' : r.variance < 0 ? 'diff-under' : 'diff-neutral'}">${isFinite(r.variance_pct) ? fmtPct(r.variance_pct) : 'NEW'}</td>
           <td>${statusBadge(r)}${r.isOverridden ? ' <span class="lock-icon" title="Manually overridden">✎</span>' : ''}</td>
           <td class="actions">${r.isOverridden ? `<button class="btn-mini" data-reset-actual="${escapeHtml(r.category)}">Reset</button>` : ''}</td>
-        </tr>
-      `).join("")}
+        </tr>`;
+      }).join("")}
     </tbody>
   `;
 
@@ -2384,6 +2429,122 @@ function updateSegmentGroupTotals() {
   });
 }
 
+/* -------- Historical Net Worth snapshots -------- */
+function computeCurrentNetWorth() {
+  const invs = (appData.projection_segments || []).filter(s => s.type === "investment");
+  const totalAssets = invs.reduce((sum, s) => sum + Number(s.current_balance || 0), 0);
+  const totalLiabilities = totalLoans().outstanding;
+  return { totalAssets, totalLiabilities, netWorth: totalAssets - totalLiabilities };
+}
+
+function monthKeyFromDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+
+function takeNetWorthSnapshot(force = false) {
+  const nw = computeCurrentNetWorth();
+  // Skip if no data yet (fresh visitor)
+  if (nw.totalAssets === 0 && nw.totalLiabilities === 0 && !force) return null;
+  const today = new Date();
+  const monthKey = monthKeyFromDate(today);
+  const dateStr = today.toISOString().slice(0, 10);
+  if (!appData.nw_snapshots) appData.nw_snapshots = [];
+  // Update existing snapshot for this month, or add new
+  const existing = appData.nw_snapshots.find(s => monthKeyFromDate(new Date(s.date)) === monthKey);
+  if (existing) {
+    existing.date = dateStr;
+    existing.net_worth = nw.netWorth;
+    existing.total_assets = nw.totalAssets;
+    existing.total_liabilities = nw.totalLiabilities;
+  } else {
+    appData.nw_snapshots.push({
+      id: nextId(appData.nw_snapshots),
+      date: dateStr,
+      net_worth: nw.netWorth,
+      total_assets: nw.totalAssets,
+      total_liabilities: nw.totalLiabilities,
+      notes: ""
+    });
+  }
+  saveAll();
+  return nw;
+}
+
+function renderNetWorthHistory() {
+  const snaps = (appData.nw_snapshots || []).slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+  const wrap = $("#nw-history-wrap");
+  const empty = $("#nw-history-empty");
+  const deltaEl = $("#nw-delta");
+
+  if (snaps.length < 2) {
+    if (wrap) wrap.style.display = "none";
+    if (empty) empty.style.display = "block";
+    if (deltaEl) deltaEl.textContent = snaps.length === 1
+      ? `First snapshot on ${new Date(snaps[0].date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${fmtINR(snaps[0].net_worth)}`
+      : "Snapshots track your journey · auto-recorded monthly";
+    return;
+  }
+  if (wrap) wrap.style.display = "block";
+  if (empty) empty.style.display = "none";
+
+  // Delta: latest vs 1 month ago (previous snapshot) + latest vs 1 year ago
+  const latest = snaps[snaps.length - 1];
+  const prev = snaps[snaps.length - 2];
+  const monthDelta = latest.net_worth - prev.net_worth;
+  const monthPct = prev.net_worth > 0 ? (monthDelta / prev.net_worth) * 100 : 0;
+  const oneYearAgo = new Date(latest.date);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const yearRef = snaps.filter(s => new Date(s.date) <= oneYearAgo).pop();
+  let deltaText = `<b>${monthDelta >= 0 ? "▲" : "▼"} ${fmtINR(Math.abs(monthDelta))}</b> since ${new Date(prev.date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} <span class="${monthDelta >= 0 ? 'text-success' : 'text-danger'}">(${monthDelta >= 0 ? '+' : ''}${monthPct.toFixed(1)}%)</span>`;
+  if (yearRef && yearRef !== prev) {
+    const yearDelta = latest.net_worth - yearRef.net_worth;
+    const yearPct = yearRef.net_worth > 0 ? (yearDelta / yearRef.net_worth) * 100 : 0;
+    deltaText += ` · <b>${yearDelta >= 0 ? "▲" : "▼"} ${fmtINR(Math.abs(yearDelta))}</b> YoY (${yearDelta >= 0 ? '+' : ''}${yearPct.toFixed(1)}%)`;
+  }
+  if (deltaEl) deltaEl.innerHTML = deltaText;
+
+  // Chart data
+  const labels = snaps.map(s => new Date(s.date).toLocaleDateString("en-IN", { month: "short", year: "2-digit" }));
+  makeChart("chart-nw-history", "line", {
+    labels,
+    datasets: [
+      {
+        label: "Net Worth (₹L)",
+        data: snaps.map(s => +(Number(s.net_worth) / 100000).toFixed(2)),
+        borderColor: "#8b5cf6",
+        backgroundColor: "rgba(139,92,246,0.14)",
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.35,
+        pointRadius: snaps.length < 25 ? 3 : 0,
+        pointBackgroundColor: "#8b5cf6"
+      },
+      {
+        label: "Total Assets (₹L)",
+        data: snaps.map(s => +(Number(s.total_assets) / 100000).toFixed(2)),
+        borderColor: "#10d9a3",
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        fill: false,
+        tension: 0.35,
+        pointRadius: 0
+      },
+      {
+        label: "Liabilities (₹L)",
+        data: snaps.map(s => +(Number(s.total_liabilities) / 100000).toFixed(2)),
+        borderColor: "#f43f5e",
+        backgroundColor: "transparent",
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        fill: false,
+        tension: 0.35,
+        pointRadius: 0
+      }
+    ]
+  });
+}
+
 /* -------- Sync investment balances from holdings (Investments + Real Estate tabs) -------- */
 // Each Future-tab investment segment's current_balance is recomputed by aggregating
 // the granular holdings from the Investments tab (by category) and Real Estate tab (sum).
@@ -3481,6 +3642,21 @@ function wireUI() {
   });
   wire("#btn-apply-exp-structure", applyStandardExpenseStructure);
 
+  // Net Worth snapshots (Dashboard)
+  wire("#btn-take-snapshot", () => {
+    const nw = takeNetWorthSnapshot(true);
+    if (!nw) { toast("Nothing to snapshot yet — add some investments or loans first.", "warn"); return; }
+    renderNetWorthHistory();
+    toast(`Snapshot saved: ${fmtINR(nw.netWorth)}`);
+  });
+  wire("#btn-clear-snapshots", () => {
+    if (!confirm("Delete ALL net-worth snapshots? Your historical chart will reset.")) return;
+    appData.nw_snapshots = [];
+    saveAll();
+    renderNetWorthHistory();
+    toast("Snapshots cleared.");
+  });
+
   // Sync Investment balances from Investments + Real Estate tabs
   wire("#btn-sync-investments", () => {
     const result = syncInvestmentBalancesFromHoldings();
@@ -3624,6 +3800,8 @@ function init() {
   wireUI();
   updateTopbarTitle("dashboard");
   loadAll();      // populates appData from localStorage if present, otherwise leaves it empty
+  // Auto-snapshot net worth once per month (skips if no data)
+  takeNetWorthSnapshot(false);
   renderAll();    // empty state shows a welcome card with explicit opt-in to load sample data
 }
 document.addEventListener("DOMContentLoaded", init);

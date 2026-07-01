@@ -192,6 +192,26 @@
         </div>
       </div>
 
+      <!-- Historical Net Worth -->
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Net Worth Over Time</h3>
+            <span class="card-sub" id="nw-delta">Snapshots track your journey · auto-recorded monthly</span>
+          </div>
+          <div class="row">
+            <button class="btn ghost btn-sm" id="btn-take-snapshot">📷 Snapshot Now</button>
+            <button class="btn ghost btn-sm" id="btn-clear-snapshots" title="Delete all snapshots (cannot be undone)">×</button>
+          </div>
+        </div>
+        <div class="chart-wrap" id="nw-history-wrap" style="height:280px">
+          <canvas id="chart-nw-history"></canvas>
+        </div>
+        <div id="nw-history-empty" class="muted small" style="display:none;text-align:center;padding:14px">
+          Take snapshots at least once a month to see your net-worth trajectory. Auto-snapshots run on each app load.
+        </div>
+      </div>
+
       <!-- Liquidity Ladder -->
       <div class="card">
         <div class="card-head">
