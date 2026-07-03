@@ -201,6 +201,16 @@ function getTaxonomy(type) {
 }
 function getCategories() { return getTaxonomy("category"); }
 function getCards() { return getTaxonomy("card"); }
+
+// Predefined investment dropdown values
+const INVESTMENT_TERMS = ["Short Term", "Mid Term", "Long Term", "Retirement"];
+const INVESTMENT_CATEGORIES = ["Equity", "FD", "Gold", "Retirement", "Business", "Real Estate"];
+function getInvestmentOwners() {
+  const owners = new Set();
+  (appData.investments || []).forEach(inv => { if ((inv.owner || "").trim()) owners.add(inv.owner.trim()); });
+  (appData.real_estate || []).forEach(re => { if ((re.owner || "").trim()) owners.add(re.owner.trim()); });
+  return Array.from(owners).sort();
+}
 function getSubcategories(category) {
   const all = (appData.taxonomy || []).filter(t => t.type === "subcategory");
   if (category) {
@@ -629,12 +639,21 @@ function plannedMonthly() {
 }
 
 /* -------------------- Dashboard -------------------- */
+// Ensure Future/Dashboard segments reflect the latest holdings before any KPI or chart is computed.
+// Called at the top of every render so users don't have to click "Sync" manually.
+function autoSyncSegmentBalances() {
+  try { syncInvestmentBalancesFromHoldings(false); } catch (e) { console.warn("autoSync failed:", e); }
+}
+
 function isAppDataEmpty() {
   const arrays = ["investments", "loans", "real_estate", "transactions", "planned_budget", "projection_segments", "goals"];
   return arrays.every(k => !appData[k] || appData[k].length === 0);
 }
 
 function renderDashboard() {
+  // Auto-refresh investment segment balances from Investments + Real Estate tabs first
+  autoSyncSegmentBalances();
+
   // Show welcome card if nothing has been added yet (fresh visitor)
   const welcome = $("#welcome-card");
   if (welcome) welcome.style.display = isAppDataEmpty() ? "block" : "none";
@@ -1824,6 +1843,8 @@ function applyRealReturnAdjustment(series) {
 }
 
 function renderProjections() {
+  // Auto-refresh investment segment balances from Investments + Real Estate tabs first
+  autoSyncSegmentBalances();
   ensurePensionAnnuitySegment();
   const setVal = (sel, v) => { const el = $(sel); if (el) el.value = v; };
   setVal("#assump-return", appData.assumptions.return_pct);
@@ -2548,7 +2569,7 @@ function renderNetWorthHistory() {
 /* -------- Sync investment balances from holdings (Investments + Real Estate tabs) -------- */
 // Each Future-tab investment segment's current_balance is recomputed by aggregating
 // the granular holdings from the Investments tab (by category) and Real Estate tab (sum).
-function syncInvestmentBalancesFromHoldings() {
+function syncInvestmentBalancesFromHoldings(persist = true) {
   let updated = 0;
   const segments = appData.projection_segments || [];
 
@@ -2566,22 +2587,25 @@ function syncInvestmentBalancesFromHoldings() {
     const seg = segments.find(s => s.type === "investment" && segPattern.test(s.name || ""));
     if (!seg) return;
     const totalRupees = (appData.investments || [])
-      .filter(inv => invCat.test(inv.category || ""))
+      .filter(inv => invCat.test((inv.category || "").trim()))
       .reduce((sum, inv) => sum + Number(inv.current_value_lakh || 0) * 100000, 0);
-    seg.current_balance = totalRupees;
-    updated++;
+    if (Number(seg.current_balance || 0) !== totalRupees) {
+      seg.current_balance = totalRupees;
+      updated++;
+    }
   });
 
-  // Real Estate: aggregate property current_value (minus outstanding_loan? user choice — using gross value here to match Real Estate segment semantics)
   const reSeg = segments.find(s => s.type === "investment" && /real\s*estate/i.test(s.name || ""));
   if (reSeg) {
     const reTotal = (appData.real_estate || [])
       .reduce((sum, p) => sum + Number(p.current_value || 0), 0);
-    reSeg.current_balance = reTotal;
-    updated++;
+    if (Number(reSeg.current_balance || 0) !== reTotal) {
+      reSeg.current_balance = reTotal;
+      updated++;
+    }
   }
 
-  saveAll();
+  if (persist && updated > 0) saveAll();
   return { updated };
 }
 
@@ -3046,12 +3070,25 @@ function openEditModal(entityName, id) {
     row.card = row.card || "Cash";
   }
 
-  // Build datalists for transactions (categories, subcategories, cards)
-  const datalistsHtml = entityName === "transactions" ? `
-    <datalist id="dl-category">${getCategories().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
-    <datalist id="dl-subcategory">${getSubcategories().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
-    <datalist id="dl-card">${getCards().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
-  ` : "";
+  // Build datalists for entities with predefined dropdown values
+  let datalistsHtml = "";
+  if (entityName === "transactions") {
+    datalistsHtml = `
+      <datalist id="dl-category">${getCategories().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
+      <datalist id="dl-subcategory">${getSubcategories().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
+      <datalist id="dl-card">${getCards().map(c => `<option value="${escapeHtml(c)}"></option>`).join("")}</datalist>
+    `;
+  } else if (entityName === "investments") {
+    datalistsHtml = `
+      <datalist id="dl-inv-term">${INVESTMENT_TERMS.map(v => `<option value="${escapeHtml(v)}"></option>`).join("")}</datalist>
+      <datalist id="dl-inv-category">${INVESTMENT_CATEGORIES.map(v => `<option value="${escapeHtml(v)}"></option>`).join("")}</datalist>
+      <datalist id="dl-inv-owner">${getInvestmentOwners().map(v => `<option value="${escapeHtml(v)}"></option>`).join("")}</datalist>
+    `;
+  } else if (entityName === "real_estate") {
+    datalistsHtml = `
+      <datalist id="dl-re-owner">${getInvestmentOwners().map(v => `<option value="${escapeHtml(v)}"></option>`).join("")}</datalist>
+    `;
+  }
 
   $("#modal-body").innerHTML = datalistsHtml + columns.map(col => {
     if (col === "id") return "";
@@ -3063,6 +3100,14 @@ function openEditModal(entityName, id) {
       inputHtml = `<input type="text" list="dl-subcategory" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick or type new…">`;
     } else if (entityName === "transactions" && col === "card") {
       inputHtml = `<input type="text" list="dl-card" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick or type new…">`;
+    } else if (entityName === "investments" && col === "term") {
+      inputHtml = `<input type="text" list="dl-inv-term" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick: Short/Mid/Long Term or Retirement">`;
+    } else if (entityName === "investments" && col === "category") {
+      inputHtml = `<input type="text" list="dl-inv-category" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick: Equity/FD/Gold/Retirement/Business">`;
+    } else if (entityName === "investments" && col === "owner") {
+      inputHtml = `<input type="text" list="dl-inv-owner" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick existing or type new">`;
+    } else if (entityName === "real_estate" && col === "owner") {
+      inputHtml = `<input type="text" list="dl-re-owner" data-field="${col}" value="${escapeHtml(val)}" autocomplete="off" placeholder="Pick existing or type new">`;
     } else if (col === "date") {
       inputHtml = `<input type="date" data-field="${col}" value="${escapeHtml(val)}">`;
     } else if (col === "amount" || col.endsWith("_amount") || col.endsWith("_lakh") || col === "outstanding" || col === "emi" || col === "monthly" || col === "annual") {
@@ -3110,6 +3155,10 @@ function openEditModal(entityName, id) {
       if (updated.category) added |= addToTaxonomy("category", updated.category, "");
       if (updated.subcategory) added |= addToTaxonomy("subcategory", updated.subcategory, updated.category || "");
       if (updated.card) added |= addToTaxonomy("card", updated.card, "");
+    }
+    // Auto-sync Future segment balances when Investments or Real Estate change
+    if (entityName === "investments" || entityName === "real_estate") {
+      syncInvestmentBalancesFromHoldings(false);
     }
     saveAll();
     closeModal();
